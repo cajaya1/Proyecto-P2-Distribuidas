@@ -1,0 +1,19 @@
+server:
+  port: 8082 # Puerto específico para Fleet Service
+
+spring:
+  application:
+    name: fleet-service
+  datasource:
+    url: jdbc:h2:file:./data/fleetdb # BD persistente en archivo
+    driverClassName: org.h2.Driver
+    username: sa
+    password: password
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update # Crea las tablas automáticamente al iniciar
+    show-sql: true # Muestra las consultas en consola (útil para debug)
+  h2:
+    console:
+      enabled: true # Permite ver la BD en http://localhost:8082/h2-console

@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Delivery - Pruebas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin-bottom: 10px;
+        }
+        
+        .token-display {
+            background: rgba(255,255,255,0.2);
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 15px;
+            word-break: break-all;
+            font-size: 12px;
+            min-height: 40px;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            background: white;
+            border: 1px solid #ddd;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .result pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 12px;
+        }
+        
+        .success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        
+        .error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            background: white;
+        }
+        
+        .table th,
+        .table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .table th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .table tr:hover {
+            background: #f5f5f5;
+        }
+        
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .status-disponible {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-recibido {
+            background: #cce5ff;
+            color: #004085;
+        }
+        
+        .status-borrador {
+            background: #fff3cd;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Sistema de Delivery - Panel de Pruebas</h1>
+            <p>Gateway: http://localhost:8085</p>
+            <div class="token-display" id="tokenDisplay">No hay token activo</div>
+        </div>
+        
+        <div class="content">
+            <!-- SECCIÓN 1: AUTENTICACIÓN -->
+            <div class="section">
+                <h2>1. Autenticación</h2>
+                
+                <h3 style="margin-top: 20px; color: #555;">Registrar Usuario</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="regUsername" placeholder="usuario123">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="regPassword" placeholder="********">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Rol</label>
+                    <select id="regRol">
+                        <option value="ADMIN">ADMIN</option>
+                        <option value="CLIENTE">CLIENTE</option>
+                        <option value="REPARTIDOR">REPARTIDOR</option>
+                        <option value="SUPERVISOR">SUPERVISOR</option>
+                    </select>
+                </div>
+                <button onclick="registrarUsuario()">Registrar Usuario</button>
+                <div id="resultRegister" class="result" style="display:none;"></div>
+                
+                <h3 style="margin-top: 30px; color: #555;">Login</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="loginUsername" placeholder="usuario123">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="loginPassword" placeholder="********">
+                    </div>
+                </div>
+                <button onclick="login()">Login</button>
+                <div id="resultLogin" class="result" style="display:none;"></div>
+                
+                <h3 style="margin-top: 30px; color: #555;">Lista de Usuarios</h3>
+                <button onclick="listarUsuarios()">Cargar Usuarios</button>
+                <div id="resultUsuariosList" class="result" style="display:none;"></div>
+            </div>
+            
+            <!-- SECCIÓN 2: FLEET SERVICE -->
+            <div class="section">
+                <h2>2. Fleet Service - Gestión de Vehículos</h2>
+                
+                <h3 style="margin-top: 20px; color: #555;">Crear Vehículo</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="vehTipo">
+                            <option value="MOTO">MOTO</option>
+                            <option value="FURGONETA">FURGONETA</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Placa</label>
+                        <input type="text" id="vehPlaca" placeholder="ABC-123">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Modelo</label>
+                        <input type="text" id="vehModelo" placeholder="Honda CBR 250">
+                    </div>
+                    <div class="form-group">
+                        <label>Capacidad Carga (kg)</label>
+                        <input type="number" id="vehCapacidad" placeholder="50">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Estado</label>
+                    <select id="vehEstado">
+                        <option value="DISPONIBLE">DISPONIBLE</option>
+                        <option value="EN_SERVICIO">EN_SERVICIO</option>
+                        <option value="MANTENIMIENTO">MANTENIMIENTO</option>
+                    </select>
+                </div>
+                <button onclick="crearVehiculo()">Crear Vehículo</button>
+                <div id="resultVehiculo" class="result" style="display:none;"></div>
+                
+                <h3 style="margin-top: 30px; color: #555;">Actualizar Estado de Vehículo (PATCH)</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>ID Vehículo</label>
+                        <input type="number" id="vehUpdateId" placeholder="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Nuevo Estado</label>
+                        <select id="vehNuevoEstado">
+                            <option value="DISPONIBLE">DISPONIBLE</option>
+                            <option value="EN_SERVICIO">EN_SERVICIO</option>
+                            <option value="MANTENIMIENTO">MANTENIMIENTO</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="actualizarEstadoVehiculo()">Actualizar Estado</button>
+                <div id="resultUpdateVehiculo" class="result" style="display:none;"></div>
+                
+                <h3 style="margin-top: 30px; color: #555;">Lista de Vehículos</h3>
+                <button onclick="listarVehiculos()">Cargar Vehículos</button>
+                <button onclick="eliminarTodosVehiculos()" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); margin-left: 10px;">Eliminar Todos los Vehículos</button>
+                <div id="resultVehiculosList" class="result" style="display:none;"></div>
+            </div>
+            
+            <!-- SECCIÓN 3: PEDIDO SERVICE -->
+            <div class="section">
+                <h2>3. Pedido Service - Gestión de Pedidos</h2>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>ID Cliente</label>
+                        <input type="number" id="pedClienteId" placeholder="100">
+                    </div>
+                    <div class="form-group">
+                        <label>Dirección de Entrega</label>
+                        <input type="text" id="pedDireccion" placeholder="Av. Principal 123">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tarifa</label>
+                        <input type="number" step="0.01" id="pedTarifa" placeholder="25.50">
+                    </div>
+                    <div class="form-group">
+                        <label>ID Repartidor (opcional)</label>
+                        <input type="number" id="pedRepartidorId" placeholder="Dejar vacío si no hay">
+                    </div>
+                </div>
+                <button onclick="crearPedido()">Crear Pedido</button>
+                <div id="resultPedido" class="result" style="display:none;"></div>
+                
+                <h3 style="margin-top: 30px; color: #555;">Buscar Pedido por Cliente ID</h3>
+                <div class="form-group">
+                    <label>ID Cliente</label>
+                    <input type="number" id="buscarClienteId" placeholder="100">
+                </div>
+                <button onclick="buscarPedidosPorCliente()">Buscar Pedidos</button>
+                <div id="resultBuscarPedidos" class="result" style="display:none;"></div>
+                
+                <h3 style="margin-top: 30px; color: #555;">Actualizar Pedido (PATCH)</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>ID Pedido</label>
+                        <input type="number" id="pedUpdateId" placeholder="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Nuevo Estado</label>
+                        <select id="pedNuevoEstado">
+                            <option value="PENDIENTE">PENDIENTE</option>
+                            <option value="ASIGNADO">ASIGNADO</option>
+                            <option value="EN_CAMINO">EN_CAMINO</option>
+                            <option value="EN_ENTREGA">EN_ENTREGA</option>
+                            <option value="ENTREGADO">ENTREGADO</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Nueva Dirección (opcional)</label>
+                    <input type="text" id="pedNuevaDireccion" placeholder="Dejar vacío para no cambiar">
+                </div>
+                <button onclick="actualizarPedido()">Actualizar Pedido</button>
+                <div id="resultUpdatePedido" class="result" style="display:none;"></div>
+                
+                <h3 style="margin-top: 30px; color: #555;">Cancelar Pedido (DELETE - Soft Delete)</h3>
+                <div class="form-group">
+                    <label>ID Pedido a Cancelar</label>
+                    <input type="number" id="pedCancelarId" placeholder="1">
+                </div>
+                <button onclick="cancelarPedido()" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);">Cancelar Pedido</button>
+                <div id="resultCancelarPedido" class="result" style="display:none;"></div>
+                
+                <h3 style="margin-top: 30px; color: #555;">Lista de Pedidos</h3>
+                <button onclick="listarPedidos()">Cargar Pedidos</button>
+                <div id="resultPedidosList" class="result" style="display:none;"></div>
+            </div>
+            
+            <!-- SECCIÓN 4: BILLING SERVICE -->
+            <div class="section">
+                <h2>4. Billing Service - Generación de Facturas</h2>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>ID Pedido</label>
+                        <input type="number" id="facPedidoId" placeholder="1">
+                    </div>
+                    <div class="form-group">
+                        <label>ID Cliente</label>
+                        <input type="number" id="facClienteId" placeholder="100">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Subtotal</label>
+                    <input type="number" step="0.01" id="facSubtotal" placeholder="100.00">
+                </div>
+                <button onclick="crearFactura()">Generar Factura</button>
+                <div id="resultFactura" class="result" style="display:none;"></div>
+                
+                <h3 style="margin-top: 30px; color: #555;">Lista de Facturas</h3>
+                <button onclick="listarFacturas()">Cargar Facturas</button>
+                <div id="resultFacturasList" class="result" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'http://localhost:8085';
+        let currentToken = null;
+        
+        function updateTokenDisplay() {
+            const display = document.getElementById('tokenDisplay');
+            if (currentToken) {
+                display.textContent = `Token activo: ${currentToken.substring(0, 50)}...`;
+                display.style.background = 'rgba(76, 175, 80, 0.3)';
+            } else {
+                display.textContent = 'No hay token activo';
+                display.style.background = 'rgba(255,255,255,0.2)';
+            }
+        }
+        
+        function showResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = isError ? 'result error' : 'result success';
+            
+            if (typeof data === 'string') {
+                element.innerHTML = `<pre>${data}</pre>`;
+            } else {
+                element.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            }
+        }
+        
+        async function registrarUsuario() {
+            const username = document.getElementById('regUsername').value;
+            const password = document.getElementById('regPassword').value;
+            const rol = document.getElementById('regRol').value;
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password, rol })
+                });
+                
+                const data = await response.text();
+                showResult('resultRegister', `Usuario registrado exitosamente: ${data}`, false);
+            } catch (error) {
+                showResult('resultRegister', `Error: ${error.message}`, true);
+            }
+        }
+        
+        async function login() {
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+                
+                currentToken = await response.text();
+                updateTokenDisplay();
+                showResult('resultLogin', 'Login exitoso! Token guardado automáticamente.', false);
+            } catch (error) {
+                showResult('resultLogin', `Error en login: ${error.message}`, true);
+            }
+        }
+        
+        async function listarUsuarios() {
+            try {
+                const response = await fetch(`${API_URL}/auth/usuarios`, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    showResult('resultUsuariosList', 'No hay usuarios registrados', false);
+                    return;
+                }
+                
+                let html = '<table class="table"><thead><tr><th>ID</th><th>Username</th><th>Rol</th></tr></thead><tbody>';
+                data.forEach(u => {
+                    html += `<tr>
+                        <td>${u.id}</td>
+                        <td>${u.username}</td>
+                        <td><span class="status-badge status-disponible">${u.rol}</span></td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                
+                document.getElementById('resultUsuariosList').innerHTML = html;
+                document.getElementById('resultUsuariosList').style.display = 'block';
+                document.getElementById('resultUsuariosList').className = 'result';
+            } catch (error) {
+                showResult('resultUsuariosList', `Error: ${error.message}`, true);
+            }
+        }
+        
+        function getAuthHeaders() {
+            if (!currentToken) {
+                throw new Error('Debes hacer login primero');
+            }
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentToken}`
+            };
+        }
+        
+        async function crearVehiculo() {
+            try {
+                const body = {
+                    tipo: document.getElementById('vehTipo').value,
+                    placa: document.getElementById('vehPlaca').value,
+                    modelo: document.getElementById('vehModelo').value,
+                    capacidadCarga: parseFloat(document.getElementById('vehCapacidad').value),
+                    estado: document.getElementById('vehEstado').value
+                };
+                
+                const response = await fetch(`${API_URL}/api/fleet/vehiculos`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(body)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                showResult('resultVehiculo', data, false);
+            } catch (error) {
+                showResult('resultVehiculo', `Error: ${error.message}`, true);
+            }
+        }
+        
+        async function listarVehiculos() {
+            try {
+                const response = await fetch(`${API_URL}/api/fleet/vehiculos`, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    showResult('resultVehiculosList', 'No hay vehículos registrados', false);
+                    return;
+                }
+                
+                let html = '<table class="table"><thead><tr><th>ID</th><th>Tipo</th><th>Placa</th><th>Modelo</th><th>Capacidad</th><th>Estado</th></tr></thead><tbody>';
+                data.forEach(v => {
+                    html += `<tr>
+                        <td>${v.id}</td>
+                        <td>${v.tipo}</td>
+                        <td>${v.placa}</td>
+                        <td>${v.modelo}</td>
+                        <td>${v.capacidadCarga} kg</td>
+                        <td><span class="status-badge status-disponible">${v.estado}</span></td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                
+                document.getElementById('resultVehiculosList').innerHTML = html;
+                document.getElementById('resultVehiculosList').style.display = 'block';
+                document.getElementById('resultVehiculosList').className = 'result';
+            } catch (error) {
+                showResult('resultVehiculosList', `Error: ${error.message}`, true);
+            }
+        }
+        
+        async function crearPedido() {
+            try {
+                const body = {
+                    clienteId: parseInt(document.getElementById('pedClienteId').value),
+                    direccionEntrega: document.getElementById('pedDireccion').value,
+                    tarifa: parseFloat(document.getElementById('pedTarifa').value)
+                };
+                
+                const repartidorId = document.getElementById('pedRepartidorId').value;
+                if (repartidorId) {
+                    body.repartidorId = parseInt(repartidorId);
+                }
+                
+                const response = await fetch(`${API_URL}/api/pedidos`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(body)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                showResult('resultPedido', data, false);
+            } catch (error) {
+                showResult('resultPedido', `Error: ${error.message}`, true);
+            }
+        }
+        
+        async function listarPedidos() {
+            try {
+                const response = await fetch(`${API_URL}/api/pedidos`, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    showResult('resultPedidosList', 'No hay pedidos registrados', false);
+                    return;
+                }
+                
+                let html = '<table class="table"><thead><tr><th>ID</th><th>Cliente</th><th>Dirección</th><th>Tarifa</th><th>Repartidor</th><th>Estado</th></tr></thead><tbody>';
+                data.forEach(p => {
+                    html += `<tr>
+                        <td>${p.id}</td>
+                        <td>${p.clienteId}</td>
+                        <td>${p.direccionEntrega}</td>
+                        <td>$${p.tarifa.toFixed(2)}</td>
+                        <td>${p.repartidorId || 'N/A'}</td>
+                        <td><span class="status-badge status-recibido">${p.estado}</span></td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                
+                document.getElementById('resultPedidosList').innerHTML = html;
+                document.getElementById('resultPedidosList').style.display = 'block';
+                document.getElementById('resultPedidosList').className = 'result';
+            } catch (error) {
+                showResult('resultPedidosList', `Error: ${error.message}`, true);
+            }
+        }
+        
+        async function buscarPedidosPorCliente() {
+            try {
+                const clienteId = document.getElementById('buscarClienteId').value;
+                const response = await fetch(`${API_URL}/api/pedidos?clienteId=${clienteId}`, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    showResult('resultBuscarPedidos', `No hay pedidos para el cliente ${clienteId}`, false);
+                    return;
+                }
+                
+                let html = '<table class="table"><thead><tr><th>ID</th><th>Cliente</th><th>Dirección</th><th>Tarifa</th><th>Estado</th></tr></thead><tbody>';
+                data.forEach(p => {
+                    html += `<tr>
+                        <td>${p.id}</td>
+                        <td>${p.clienteId}</td>
+                        <td>${p.direccionEntrega}</td>
+                        <td>$${p.tarifa.toFixed(2)}</td>
+                        <td><span class="status-badge status-recibido">${p.estado}</span></td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                
+                document.getElementById('resultBuscarPedidos').innerHTML = html;
+                document.getElementById('resultBuscarPedidos').style.display = 'block';
+                document.getElementById('resultBuscarPedidos').className = 'result';
+            } catch (error) {
+                showResult('resultBuscarPedidos', `Error: ${error.message}`, true);
+            }
+        }
+        
+        async function crearFactura() {
+            try {
+                const body = {
+                    pedidoId: parseInt(document.getElementById('facPedidoId').value),
+                    clienteId: parseInt(document.getElementById('facClienteId').value),
+                    subtotal: parseFloat(document.getElementById('facSubtotal').value)
+                };
+                
+                const response = await fetch(`${API_URL}/api/billing/facturas`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(body)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                showResult('resultFactura', data, false);
+            } catch (error) {
+                showResult('resultFactura', `Error: ${error.message}`, true);
+            }
+        }
+        
+        async function listarFacturas() {
+            try {
+                const response = await fetch(`${API_URL}/api/billing/facturas`, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    showResult('resultFacturasList', 'No hay facturas registradas', false);
+                    return;
+                }
+                
+                let html = '<table class="table"><thead><tr><th>ID</th><th>Pedido</th><th>Cliente</th><th>Subtotal</th><th>IVA (15%)</th><th>Total</th><th>Estado</th></tr></thead><tbody>';
+                data.forEach(f => {
+                    html += `<tr>
+                        <td>${f.id}</td>
+                        <td>${f.pedidoId}</td>
+                        <td>${f.clienteId}</td>
+                        <td>$${f.subtotal.toFixed(2)}</td>
+                        <td>$${f.impuestos.toFixed(2)}</td>
+                        <td><strong>$${f.total.toFixed(2)}</strong></td>
+                        <td><span class="status-badge status-borrador">${f.estado}</span></td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                
+                document.getElementById('resultFacturasList').innerHTML = html;
+                document.getElementById('resultFacturasList').style.display = 'block';
+                document.getElementById('resultFacturasList').className = 'result';
+            } catch (error) {
+                showResult('resultFacturasList', `Error: ${error.message}`, true);
+            }
+        }
+        
+        async function eliminarTodosVehiculos() {
+            if (!confirm('¿Estás seguro de eliminar TODOS los vehículos? Esta acción no se puede deshacer.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/api/fleet/vehiculos`, {
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+                
+                showResult('resultVehiculosList', 'Todos los vehículos han sido eliminados exitosamente', false);
+                setTimeout(() => {
+                    document.getElementById('resultVehiculosList').style.display = 'none';
+                }, 3000);
+            } catch (error) {
+                showResult('resultVehiculosList', `Error: ${error.message}`, true);
+            }
+        }
+        
+        // NUEVAS FUNCIONES - FASE 1 COMPLIANCE
+        
+        async function actualizarEstadoVehiculo() {
+            const id = document.getElementById('vehUpdateId').value;
+            const estado = document.getElementById('vehNuevoEstado').value;
+            
+            if (!id) {
+                showResult('resultUpdateVehiculo', 'Debes ingresar el ID del vehículo', true);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/api/fleet/vehiculos/${id}/estado`, {
+                    method: 'PATCH',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ estado: estado })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.text();
+                    throw new Error(`Error ${response.status}: ${errorData}`);
+                }
+                
+                const data = await response.json();
+                showResult('resultUpdateVehiculo', `✅ Estado actualizado exitosamente:<br>ID: ${data.id}<br>Tipo: ${data.tipo}<br>Placa: ${data.placa}<br>Nuevo Estado: <strong>${data.estado}</strong>`, false);
+            } catch (error) {
+                showResult('resultUpdateVehiculo', `Error: ${error.message}`, true);
+            }
+        }
+        
+        async function actualizarPedido() {
+            const id = document.getElementById('pedUpdateId').value;
+            const estado = document.getElementById('pedNuevoEstado').value;
+            const direccion = document.getElementById('pedNuevaDireccion').value;
+            
+            if (!id) {
+                showResult('resultUpdatePedido', 'Debes ingresar el ID del pedido', true);
+                return;
+            }
+            
+            const updates = { estado: estado };
+            if (direccion && direccion.trim() !== '') {
+                updates.direccionEntrega = direccion;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/api/pedidos/${id}`, {
+                    method: 'PATCH',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(updates)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.text();
+                    throw new Error(`Error ${response.status}: ${errorData}`);
+                }
+                
+                const data = await response.json();
+                showResult('resultUpdatePedido', `✅ Pedido actualizado exitosamente:<br>ID: ${data.id}<br>Cliente ID: ${data.clienteId}<br>Estado: <strong>${data.estado}</strong><br>Dirección: ${data.direccionEntrega}<br>Cancelado: ${data.cancelado ? 'Sí' : 'No'}`, false);
+            } catch (error) {
+                showResult('resultUpdatePedido', `Error: ${error.message}`, true);
+            }
+        }
+        
+        async function cancelarPedido() {
+            const id = document.getElementById('pedCancelarId').value;
+            
+            if (!id) {
+                showResult('resultCancelarPedido', 'Debes ingresar el ID del pedido', true);
+                return;
+            }
+            
+            if (!confirm(`¿Estás seguro de cancelar el pedido #${id}? Esta acción marcará el pedido como cancelado (soft delete).`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/api/pedidos/${id}`, {
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.text();
+                    throw new Error(`Error ${response.status}: ${errorData}`);
+                }
+                
+                showResult('resultCancelarPedido', `✅ Pedido #${id} cancelado exitosamente (soft delete)`, false);
+            } catch (error) {
+                showResult('resultCancelarPedido', `Error: ${error.message}`, true);
+            }
+        }
+    </script>
+</body>
+</html>

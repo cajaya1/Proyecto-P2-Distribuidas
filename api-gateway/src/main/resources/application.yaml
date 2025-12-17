@@ -1,0 +1,59 @@
+server:
+  port: 8085 # Puerto temporal para pruebas (8080 está ocupado) 
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      # Configuración de CORS (Para que el Frontend pueda llamar al Gateway)
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*" # En producción cambiar por dominio real
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+
+      # Definición de Rutas a los Microservicios 
+      routes:
+        # 1. AUTH (Pública - Sin filtro de seguridad)
+        - id: auth-service
+          uri: http://localhost:8081
+          predicates:
+            - Path=/auth/**
+
+        # 2. FLEET (Privada - Requiere Token)
+        - id: fleet-service
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/fleet/**
+          filters:
+            - Authentication
+
+        # 3. PEDIDOS (Privada - Requiere Token)
+        - id: pedido-service
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/pedidos/**
+          filters:
+            - Authentication
+
+        # 4. BILLING (Privada - Requiere Token)
+        - id: billing-service
+          uri: http://localhost:8084
+          predicates:
+            - Path=/api/billing/**
+          filters:
+            - Authentication
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
