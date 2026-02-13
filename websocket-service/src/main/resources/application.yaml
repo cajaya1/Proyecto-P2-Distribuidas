@@ -1,0 +1,27 @@
+server:
+  port: 8089
+
+spring:
+  application:
+    name: websocket-service
+  
+  # Configuración RabbitMQ
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+# Queues a escuchar (colas separadas para websocket)
+rabbitmq:
+  exchanges:
+    pedidos: pedidos.exchange
+    tracking: tracking.exchange
+  queues:
+    pedido-creado: websocket.pedido.creado
+    pedido-actualizado: websocket.pedido.actualizado
+    ubicacion: websocket.ubicacion.actualizada
+  routing-keys:
+    creado: pedido.creado
+    actualizado: pedido.estado.actualizado
+    ubicacion: tracking.ubicacion

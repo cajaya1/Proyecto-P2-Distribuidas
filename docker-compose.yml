@@ -1,0 +1,270 @@
+version: '3.8'
+
+services:
+  # ==================== INFRASTRUCTURE ====================
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: logiflow-rabbitmq
+    ports:
+      - "15673:5672"
+      - "25672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - logiflow-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==================== BACKEND MICROSERVICES ====================
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: logiflow-auth
+    ports:
+      - "9081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=admin
+      - SPRING_RABBITMQ_PASSWORD=admin123
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - logiflow-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  pedido-service:
+    build:
+      context: ./pedido-service
+      dockerfile: Dockerfile
+    container_name: logiflow-pedido
+    ports:
+      - "9082:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=admin
+      - SPRING_RABBITMQ_PASSWORD=admin123
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    networks:
+      - logiflow-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  fleet-service:
+    build:
+      context: ./fleet-service
+      dockerfile: Dockerfile
+    container_name: logiflow-fleet
+    ports:
+      - "9083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=admin
+      - SPRING_RABBITMQ_PASSWORD=admin123
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - logiflow-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  billing-service:
+    build:
+      context: ./billing-service
+      dockerfile: Dockerfile
+    container_name: logiflow-billing
+    ports:
+      - "9084:8084"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=admin
+      - SPRING_RABBITMQ_PASSWORD=admin123
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - logiflow-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: logiflow-gateway
+    ports:
+      - "9085:8085"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - AUTH_SERVICE_URL=http://auth-service:8081
+      - PEDIDO_SERVICE_URL=http://pedido-service:8082
+      - FLEET_SERVICE_URL=http://fleet-service:8083
+      - BILLING_SERVICE_URL=http://billing-service:8084
+    depends_on:
+      - auth-service
+      - pedido-service
+      - fleet-service
+      - billing-service
+    networks:
+      - logiflow-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8085/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: logiflow-notification
+    ports:
+      - "9086:8086"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=admin
+      - SPRING_RABBITMQ_PASSWORD=admin123
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - logiflow-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8086/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  tracking-service:
+    build:
+      context: ./tracking-service
+      dockerfile: Dockerfile
+    container_name: logiflow-tracking
+    ports:
+      - "9087:8087"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=admin
+      - SPRING_RABBITMQ_PASSWORD=admin123
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - logiflow-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8087/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  graphql-service:
+    build:
+      context: ./graphql-service
+      dockerfile: Dockerfile
+    container_name: logiflow-graphql
+    ports:
+      - "9088:8088"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - PEDIDO_SERVICE_URL=http://pedido-service:8082
+      - FLEET_SERVICE_URL=http://fleet-service:8083
+    depends_on:
+      - pedido-service
+      - fleet-service
+    networks:
+      - logiflow-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8088/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  websocket-service:
+    build:
+      context: ./websocket-service
+      dockerfile: Dockerfile
+    container_name: logiflow-websocket
+    ports:
+      - "9089:8089"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=admin
+      - SPRING_RABBITMQ_PASSWORD=admin123
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - logiflow-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8089/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==================== FRONTEND ====================
+  frontend:
+    build:
+      context: ./logiflow-frontend
+      dockerfile: Dockerfile
+    container_name: logiflow-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api-gateway
+      - auth-service
+      - pedido-service
+    networks:
+      - logiflow-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  rabbitmq_data:
+    driver: local
+
+networks:
+  logiflow-network:
+    driver: bridge
+

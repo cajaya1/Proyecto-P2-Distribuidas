@@ -50,6 +50,6 @@ public class AuthenticationGatewayFilterFactory extends AbstractGatewayFilterFac
     }
 
     public static class Config {
-        // Configuración vacía por ahora
+        
     }
 }

@@ -16,4 +16,18 @@ spring:
     show-sql: true
   h2:
     console:
-      enabled: true # Acceder en http://localhost:8083/h2-console
+      enabled: true # Acceder en http://localhost:8083/h2-console  
+  # Configuración RabbitMQ
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+# Configuración de Exchanges y Routing Keys
+rabbitmq:
+  exchanges:
+    pedidos: pedidos.exchange
+  routing-keys:
+    creado: pedido.creado
+    actualizado: pedido.estado.actualizado

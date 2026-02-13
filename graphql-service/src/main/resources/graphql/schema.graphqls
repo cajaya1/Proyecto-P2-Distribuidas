@@ -1,0 +1,61 @@
+type Query {
+    # Consultas de Pedidos
+    pedido(id: ID!): Pedido
+    pedidos(filtro: PedidoFiltro): [Pedido!]!
+    pedidosPorEstado(estado: String!): [Pedido!]!
+    
+    # Consultas de Flota
+    vehiculo(id: ID!): Vehiculo
+    vehiculos: [Vehiculo!]!
+    vehiculosDisponibles: [Vehiculo!]!
+    
+    # KPIs y Métricas
+    kpiDiario(fecha: String): KPIDiario
+    flotaActiva: FlotaResumen
+}
+
+# Tipos de Datos
+type Pedido {
+    id: ID!
+    clienteId: Int!
+    direccionEntrega: String!
+    peso: Float!
+    estado: String!
+    tarifa: Float!
+    repartidorId: Int
+    cancelado: Boolean!
+}
+
+type Vehiculo {
+    id: ID!
+    placa: String!
+    modelo: String!
+    tipo: String!
+    estado: String!
+    capacidad: Float
+    pesoMaximo: Float
+}
+
+type KPIDiario {
+    fecha: String!
+    totalPedidos: Int!
+    pedidosEntregados: Int!
+    pedidosPendientes: Int!
+    pedidosCancelados: Int!
+    tarifaPromedio: Float!
+    vehiculosActivos: Int!
+}
+
+type FlotaResumen {
+    total: Int!
+    disponibles: Int!
+    enRuta: Int!
+    mantenimiento: Int!
+}
+
+# Input para filtros
+input PedidoFiltro {
+    estado: String
+    clienteId: Int
+    repartidorId: Int
+}

@@ -1,0 +1,71 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: notification-service
+  
+  datasource:
+    url: jdbc:h2:file:./data/notificationdb
+    driverClassName: org.h2.Driver
+    username: sa
+    password:
+  
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  
+  # Configuración RabbitMQ
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        acknowledge-mode: auto
+        prefetch: 10
+  
+  # Configuración de Email (mock - para desarrollo)
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: noreply@logiflow.com
+    password: mock_password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+# Configuración de Queues que escucha
+rabbitmq:
+  exchanges:
+    pedidos: pedidos.exchange
+    tracking: tracking.exchange
+  queues:
+    pedido-creado: pedido.creado
+    pedido-actualizado: pedido.estado.actualizado
+    ubicacion-actualizada: repartidor.ubicacion.actualizada
+  routing-keys:
+    creado: pedido.creado
+    actualizado: pedido.estado.actualizado
+    ubicacion: tracking.ubicacion
+
+# Documentación OpenAPI
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html

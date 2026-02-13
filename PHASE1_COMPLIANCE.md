@@ -1,6 +1,6 @@
 # Sistema de Gestión de Pedidos - Cumplimiento Fase 1
 
-## ✅ Implementaciones Completadas
+## Implementaciones Completadas
 
 ### 1. Arquitectura de Microservicios
 - **5 Microservicios independientes**:
@@ -141,31 +141,31 @@ public abstract class Vehiculo {
 
 ### 12. Operaciones CRUD Completas
 #### Pedidos:
-- ✅ POST /api/pedidos - Crear pedido
-- ✅ GET /api/pedidos - Listar todos
-- ✅ GET /api/pedidos/{id} - Obtener por ID
-- ✅ PATCH /api/pedidos/{id} - Actualización parcial
-- ✅ DELETE /api/pedidos/{id} - Cancelación lógica
+-  POST /api/pedidos - Crear pedido
+-  GET /api/pedidos - Listar todos
+-  GET /api/pedidos/{id} - Obtener por ID
+-  PATCH /api/pedidos/{id} - Actualización parcial
+-  DELETE /api/pedidos/{id} - Cancelación lógica
 
 #### Vehículos:
-- ✅ POST /api/fleet/vehiculos - Crear vehículo
-- ✅ GET /api/fleet/vehiculos - Listar todos
-- ✅ GET /api/fleet/vehiculos/{id} - Obtener por ID
-- ✅ PATCH /api/fleet/vehiculos/{id}/estado - Actualizar estado
-- ✅ DELETE /api/fleet/vehiculos/{id} - Eliminar
+-  POST /api/fleet/vehiculos - Crear vehículo
+-  GET /api/fleet/vehiculos - Listar todos
+-  GET /api/fleet/vehiculos/{id} - Obtener por ID
+-  PATCH /api/fleet/vehiculos/{id}/estado - Actualizar estado
+-  DELETE /api/fleet/vehiculos/{id} - Eliminar
 
 #### Repartidores:
-- ✅ POST /api/fleet/repartidores - Crear
-- ✅ GET /api/fleet/repartidores - Listar todos
-- ✅ GET /api/fleet/repartidores/{id} - Obtener por ID
-- ✅ GET /api/fleet/repartidores/disponibles - Listar disponibles
+-  POST /api/fleet/repartidores - Crear
+-  GET /api/fleet/repartidores - Listar todos
+-  GET /api/fleet/repartidores/{id} - Obtener por ID
+-  GET /api/fleet/repartidores/disponibles - Listar disponibles
 
 #### Facturas:
-- ✅ POST /api/billing/facturas - Crear factura
-- ✅ GET /api/billing/facturas - Listar todas
-- ✅ GET /api/billing/facturas/{id} - Obtener por ID
+-  POST /api/billing/facturas - Crear factura
+-  GET /api/billing/facturas - Listar todas
+-  GET /api/billing/facturas/{id} - Obtener por ID
 
-## 🚀 Comandos para Pruebas PowerShell
+## Comandos para Pruebas PowerShell
 
 ### 1. Autenticación
 ```powershell
@@ -250,7 +250,7 @@ try {
 }
 ```
 
-## 📊 Verificación de Swagger UI
+## Verificación de Swagger UI
 
 Una vez iniciados los servicios, acceder a:
 
@@ -289,7 +289,7 @@ cd "c:\Users\cajh1\OneDrive\Documentos1\ESPE\OCT 25\DISTRIBUIDAS\Proyecto_P2\api
 .\mvnw.cmd spring-boot:run
 ```
 
-## ✅ Checklist de Cumplimiento Fase 1
+## Checklist de Cumplimiento Fase 1
 
 - [x] Arquitectura de microservicios (5 servicios)
 - [x] API Gateway con autenticación JWT
@@ -306,8 +306,8 @@ cd "c:\Users\cajh1\OneDrive\Documentos1\ESPE\OCT 25\DISTRIBUIDAS\Proyecto_P2\api
 - [x] Seguridad con Spring Security y JWT
 - [x] CORS configurado correctamente
 
-## 🎯 Estado Final
+## Estado Final
 
-**FASE 1: 100% COMPLETADA** ✅
+**FASE 1: 100% COMPLETADA** 
 
 Todos los requisitos de la Fase 1 han sido implementados exitosamente y probados. El sistema está listo para avanzar a la Fase 2.

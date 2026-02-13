@@ -1,0 +1,100 @@
+# Ingress for LogiFlow Application
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: logiflow-ingress
+  namespace: logiflow
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    # WebSocket support
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: logiflow.local
+      http:
+        paths:
+          # Frontend (default)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
+          # Auth Service API
+          - path: /api/auth
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 8081
+          # Pedido Service API
+          - path: /api/pedidos
+            pathType: Prefix
+            backend:
+              service:
+                name: pedido-service
+                port:
+                  number: 8082
+          # Fleet Service API
+          - path: /api/fleet
+            pathType: Prefix
+            backend:
+              service:
+                name: fleet-service
+                port:
+                  number: 8083
+          # Billing Service API
+          - path: /api/billing
+            pathType: Prefix
+            backend:
+              service:
+                name: billing-service
+                port:
+                  number: 8084
+          # API Gateway
+          - path: /api/gateway
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8085
+          # GraphQL Service
+          - path: /graphql
+            pathType: Prefix
+            backend:
+              service:
+                name: graphql-service
+                port:
+                  number: 8088
+          # WebSocket Service
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: websocket-service
+                port:
+                  number: 8089
+---
+# NodePort Service for local development (alternative to Ingress)
+apiVersion: v1
+kind: Service
+metadata:
+  name: logiflow-nodeport
+  namespace: logiflow
+spec:
+  type: NodePort
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30080

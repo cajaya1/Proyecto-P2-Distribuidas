@@ -16,6 +16,14 @@ public class Usuario {
 
     @Column(nullable = false)
     private String password; // Se guardará encriptada
+    
+    private String nombre; // Nombre completo del usuario
 
-    private String rol; // ADMIN, CLIENTE, REPARTIDOR, SUPERVISOR
+    private String rol; // ADMIN, CLIENTE, REPARTIDOR, SUPERVISOR, GERENTE
+    
+    private String scope; // Alcance de permisos: read, write, admin
+    
+    private String zoneId; // ID de la zona asignada (ej: QUITO_NORTE, GUAYAQUIL_SUR)
+    
+    private String fleetType; // Tipo de flota: MOTORIZADO, VEHICULO_LIVIANO, CAMION
 }

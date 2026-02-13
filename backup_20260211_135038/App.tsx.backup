@@ -1,0 +1,895 @@
+import { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix for default marker icons in React-Leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
+
+// Custom icons
+const destinoIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const repartidorIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+// ==================== TIPOS ====================
+interface Usuario {
+  id: number;
+  cedula: string;
+  nombre: string;
+  email: string;
+  rol: 'CLIENTE' | 'REPARTIDOR' | 'SUPERVISOR' | 'GERENTE';
+}
+
+interface Pedido {
+  id: number;
+  clienteId: number;
+  repartidorId?: number;
+  direccionEntrega: string;
+  estado: 'PENDIENTE' | 'ASIGNADO' | 'EN_CAMINO' | 'ENTREGADO' | 'CANCELADO';
+  tarifa: number;
+  fechaCreacion?: string;
+  descripcion?: string;
+}
+
+interface Repartidor {
+  id: number;
+  nombre: string;
+  cedula: string;
+  estado: 'DISPONIBLE' | 'EN_RUTA' | 'NO_DISPONIBLE';
+  vehiculoTipo: 'MOTORIZADO' | 'VEHICULO_LIVIANO' | 'CAMION';
+  ubicacion?: { lat: number; lng: number };
+}
+
+interface KPI {
+  totalPedidos: number;
+  entregados: number;
+  enCamino: number;
+  pendientes: number;
+  tasaEntrega: number;
+  ingresoTotal: number;
+}
+
+// ==================== API SERVICES ====================
+const API_BASE = 'http://localhost:8082';
+const AUTH_API = 'http://localhost:8081';
+
+const api = {
+  login: async (cedula: string, password: string): Promise<string> => {
+    const res = await fetch(`${AUTH_API}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: cedula, password })
+    });
+    if (!res.ok) throw new Error('Credenciales inválidas');
+    return res.text();
+  },
+
+  getPedidos: async (token: string): Promise<Pedido[]> => {
+    const res = await fetch(`${API_BASE}/api/pedidos`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return res.json();
+  },
+
+  crearPedido: async (token: string, pedido: Partial<Pedido>): Promise<Pedido> => {
+    const res = await fetch(`${API_BASE}/api/pedidos`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      },
+      body: JSON.stringify(pedido)
+    });
+    if (!res.ok) throw new Error('Error al crear pedido');
+    return res.json();
+  },
+
+  actualizarPedido: async (token: string, id: number, updates: Partial<Pedido>): Promise<Pedido> => {
+    const res = await fetch(`${API_BASE}/api/pedidos/${id}`, {
+      method: 'PATCH',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      },
+      body: JSON.stringify(updates)
+    });
+    return res.json();
+  }
+};
+
+// ==================== COMPONENTES DE UI ====================
+const styles = {
+  container: { minHeight: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif' },
+  loginBg: { background: 'linear-gradient(135deg, #1e40af 0%, #7c3aed 100%)' },
+  dashboardBg: { background: '#f3f4f6' },
+  card: { backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', padding: '24px' },
+  btn: { padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '14px' },
+  btnPrimary: { backgroundColor: '#2563eb', color: 'white' },
+  btnSuccess: { backgroundColor: '#10b981', color: 'white' },
+  btnDanger: { backgroundColor: '#ef4444', color: 'white' },
+  btnSecondary: { backgroundColor: '#6b7280', color: 'white' },
+  input: { width: '100%', padding: '12px', border: '2px solid #e5e7eb', borderRadius: '8px', fontSize: '16px', boxSizing: 'border-box' as const },
+  badge: (color: string) => ({ 
+    padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
+    backgroundColor: color === 'green' ? '#d1fae5' : color === 'yellow' ? '#fef3c7' : color === 'blue' ? '#dbeafe' : '#fee2e2',
+    color: color === 'green' ? '#065f46' : color === 'yellow' ? '#92400e' : color === 'blue' ? '#1e40af' : '#991b1b'
+  })
+};
+
+// ==================== APLICACIÓN PRINCIPAL ====================
+function App() {
+  const [token, setToken] = useState<string>('');
+  const [user, setUser] = useState<Usuario | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Simular datos de usuario basado en el rol seleccionado
+  const handleLogin = async (cedula: string, password: string, rol: Usuario['rol']) => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const tokenData = await api.login(cedula, password);
+      setToken(tokenData);
+      setUser({
+        id: 1,
+        cedula,
+        nombre: rol === 'CLIENTE' ? 'Cliente Demo' : rol === 'REPARTIDOR' ? 'Repartidor Demo' : rol === 'SUPERVISOR' ? 'Supervisor Demo' : 'Gerente Demo',
+        email: `${rol.toLowerCase()}@logiflow.com`,
+        rol
+      });
+    } catch (err) {
+      // Para demostración, permitir login simulado
+      setToken('demo-token');
+      setUser({
+        id: 1,
+        cedula,
+        nombre: rol === 'CLIENTE' ? 'Cliente Demo' : rol === 'REPARTIDOR' ? 'Repartidor Demo' : rol === 'SUPERVISOR' ? 'Supervisor Demo' : 'Gerente Demo',
+        email: `${rol.toLowerCase()}@logiflow.com`,
+        rol
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setToken('');
+    setUser(null);
+  };
+
+  if (!user) {
+    return <LoginPage onLogin={handleLogin} loading={loading} error={error} />;
+  }
+
+  return (
+    <div style={{ ...styles.container, ...styles.dashboardBg }}>
+      <Header user={user} onLogout={handleLogout} />
+      <main style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
+        {user.rol === 'CLIENTE' && <ClienteDashboard token={token} user={user} />}
+        {user.rol === 'REPARTIDOR' && <RepartidorDashboard token={token} user={user} />}
+        {user.rol === 'SUPERVISOR' && <SupervisorDashboard token={token} />}
+        {user.rol === 'GERENTE' && <GerenteDashboard token={token} />}
+      </main>
+    </div>
+  );
+}
+
+// ==================== LOGIN PAGE ====================
+function LoginPage({ onLogin, loading, error }: { onLogin: (cedula: string, password: string, rol: Usuario['rol']) => void; loading: boolean; error: string }) {
+  const [cedula, setCedula] = useState('1724562440');
+  const [password, setPassword] = useState('password123');
+  const [rol, setRol] = useState<Usuario['rol']>('CLIENTE');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onLogin(cedula, password, rol);
+  };
+
+  return (
+    <div style={{ ...styles.container, ...styles.loginBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ ...styles.card, width: '420px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{ fontSize: '64px', marginBottom: '8px' }}>🚚</div>
+          <h1 style={{ fontSize: '32px', color: '#1e40af', margin: '0 0 8px 0' }}>LogiFlow</h1>
+          <p style={{ color: '#6b7280', margin: 0 }}>Sistema de Gestión de Entregas</p>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#374151' }}>Rol</label>
+            <select
+              value={rol}
+              onChange={(e) => setRol(e.target.value as Usuario['rol'])}
+              style={{ ...styles.input }}
+            >
+              <option value="CLIENTE">👤 Cliente</option>
+              <option value="REPARTIDOR">🚴 Repartidor</option>
+              <option value="SUPERVISOR">👨‍💼 Supervisor</option>
+              <option value="GERENTE">📊 Gerente</option>
+            </select>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#374151' }}>Cédula</label>
+            <input
+              type="text"
+              value={cedula}
+              onChange={(e) => setCedula(e.target.value)}
+              style={styles.input}
+              required
+            />
+          </div>
+
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#374151' }}>Contraseña</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={styles.input}
+              required
+            />
+          </div>
+
+          {error && (
+            <div style={{ padding: '12px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '8px', marginBottom: '16px' }}>
+              {error}
+            </div>
+          )}
+
+          <button type="submit" disabled={loading} style={{ ...styles.btn, ...styles.btnPrimary, width: '100%' }}>
+            {loading ? '⏳ Iniciando sesión...' : '🔐 Iniciar Sesión'}
+          </button>
+        </form>
+
+        <div style={{ marginTop: '24px', padding: '16px', backgroundColor: '#f3f4f6', borderRadius: '8px', fontSize: '13px' }}>
+          <strong>💡 Credenciales de prueba:</strong><br />
+          Cédula: 1724562440 | Contraseña: password123
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==================== HEADER ====================
+function Header({ user, onLogout }: { user: Usuario; onLogout: () => void }) {
+  return (
+    <header style={{ backgroundColor: '#1e40af', color: 'white', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <span style={{ fontSize: '32px' }}>🚚</span>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '24px' }}>LogiFlow</h1>
+          <p style={{ margin: 0, fontSize: '14px', opacity: 0.8 }}>Panel de {user.rol.charAt(0) + user.rol.slice(1).toLowerCase()}</p>
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <span>👤 {user.nombre}</span>
+        <button onClick={onLogout} style={{ ...styles.btn, ...styles.btnDanger, padding: '8px 16px' }}>
+          Cerrar Sesión
+        </button>
+      </div>
+    </header>
+  );
+}
+
+// ==================== CLIENTE DASHBOARD ====================
+function ClienteDashboard({ token, user }: { token: string; user: Usuario }) {
+  const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [nuevoPedido, setNuevoPedido] = useState({ direccionEntrega: '', tarifa: 15, descripcion: '' });
+  const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
+
+  useEffect(() => {
+    cargarPedidos();
+  }, []);
+
+  const cargarPedidos = async () => {
+    try {
+      const data = await api.getPedidos(token);
+      setPedidos(data);
+    } catch (err) {
+      // Datos de demostración
+      setPedidos([
+        { id: 1, clienteId: 1724562440, direccionEntrega: 'Av. Amazonas N36-152, Quito', estado: 'EN_CAMINO', tarifa: 15.50, repartidorId: 1 },
+        { id: 2, clienteId: 1724562440, direccionEntrega: 'Calle García Moreno, Centro Histórico', estado: 'PENDIENTE', tarifa: 12.00 },
+        { id: 3, clienteId: 1724562440, direccionEntrega: 'Mall El Jardín, Local 234', estado: 'ENTREGADO', tarifa: 8.50, repartidorId: 2 }
+      ]);
+    }
+  };
+
+  const crearPedido = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api.crearPedido(token, {
+        clienteId: parseInt(user.cedula),
+        direccionEntrega: nuevoPedido.direccionEntrega,
+        tarifa: nuevoPedido.tarifa,
+        estado: 'PENDIENTE'
+      });
+      setShowForm(false);
+      setNuevoPedido({ direccionEntrega: '', tarifa: 15, descripcion: '' });
+      cargarPedidos();
+    } catch (err) {
+      // Agregar localmente para demo
+      setPedidos([...pedidos, {
+        id: pedidos.length + 1,
+        clienteId: parseInt(user.cedula),
+        direccionEntrega: nuevoPedido.direccionEntrega,
+        estado: 'PENDIENTE',
+        tarifa: nuevoPedido.tarifa
+      }]);
+      setShowForm(false);
+      setNuevoPedido({ direccionEntrega: '', tarifa: 15, descripcion: '' });
+    }
+    setLoading(false);
+  };
+
+  const getEstadoBadge = (estado: string) => {
+    const colors: Record<string, string> = {
+      PENDIENTE: 'blue', ASIGNADO: 'yellow', EN_CAMINO: 'yellow', ENTREGADO: 'green', CANCELADO: 'red'
+    };
+    return styles.badge(colors[estado] || 'blue');
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h2 style={{ margin: 0, fontSize: '28px', color: '#1f2937' }}>📦 Mis Pedidos</h2>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button onClick={() => setShowForm(!showForm)} style={{ ...styles.btn, ...styles.btnPrimary }}>
+            {showForm ? '❌ Cancelar' : '➕ Nuevo Pedido'}
+          </button>
+          <button onClick={cargarPedidos} style={{ ...styles.btn, ...styles.btnSuccess }}>🔄 Actualizar</button>
+        </div>
+      </div>
+
+      {showForm && (
+        <div style={{ ...styles.card, marginBottom: '24px' }}>
+          <h3 style={{ marginTop: 0 }}>📝 Crear Nuevo Pedido</h3>
+          <form onSubmit={crearPedido}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>Dirección de Entrega</label>
+                <input
+                  type="text"
+                  value={nuevoPedido.direccionEntrega}
+                  onChange={(e) => setNuevoPedido({...nuevoPedido, direccionEntrega: e.target.value})}
+                  style={styles.input}
+                  placeholder="Ej: Av. Principal 123, Quito"
+                  required
+                  minLength={10}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>Tarifa (USD)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={nuevoPedido.tarifa}
+                  onChange={(e) => setNuevoPedido({...nuevoPedido, tarifa: parseFloat(e.target.value)})}
+                  style={styles.input}
+                  required
+                />
+              </div>
+            </div>
+            <button type="submit" disabled={loading} style={{ ...styles.btn, ...styles.btnSuccess, marginTop: '16px' }}>
+              {loading ? '⏳ Creando...' : '✅ Crear Pedido'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Mapa de seguimiento con Leaflet */}
+      {selectedPedido && (
+        <div style={{ ...styles.card, marginBottom: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ margin: 0 }}>📍 Seguimiento en Tiempo Real - Pedido #{selectedPedido.id}</h3>
+            <button onClick={() => setSelectedPedido(null)} style={{ ...styles.btn, ...styles.btnSecondary, padding: '8px 16px' }}>✕ Cerrar</button>
+          </div>
+          <div style={{ marginTop: '16px', height: '350px', borderRadius: '8px', overflow: 'hidden' }}>
+            <MapContainer 
+              center={[-0.2295, -78.5243]} 
+              zoom={13} 
+              style={{ height: '100%', width: '100%' }}
+              scrollWheelZoom={true}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              {/* Marcador del destino */}
+              <Marker position={[-0.2295, -78.5243]} icon={destinoIcon}>
+                <Popup>
+                  <strong>📍 Destino de Entrega</strong><br/>
+                  {selectedPedido.direccionEntrega}
+                </Popup>
+              </Marker>
+              {/* Marcador del repartidor (simulado moviéndose) */}
+              <Marker position={[-0.2150, -78.5100]} icon={repartidorIcon}>
+                <Popup>
+                  <strong>🚚 Repartidor en camino</strong><br/>
+                  Pedido #{selectedPedido.id}
+                </Popup>
+              </Marker>
+              {/* Línea de ruta */}
+              <Polyline 
+                positions={[[-0.2150, -78.5100], [-0.2200, -78.5180], [-0.2295, -78.5243]]} 
+                color="#3b82f6" 
+                weight={4}
+                dashArray="10, 10"
+              />
+            </MapContainer>
+          </div>
+          <div style={{ marginTop: '16px', padding: '16px', backgroundColor: '#dbeafe', borderRadius: '8px' }}>
+            <strong>Estado:</strong> {selectedPedido.estado} | <strong>Dirección:</strong> {selectedPedido.direccionEntrega}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
+        {pedidos.map((pedido) => (
+          <div key={pedido.id} style={styles.card}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '20px' }}>Pedido #{pedido.id}</h3>
+                <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>Cliente: {pedido.clienteId}</p>
+              </div>
+              <span style={getEstadoBadge(pedido.estado)}>{pedido.estado}</span>
+            </div>
+            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
+              <p style={{ margin: '0 0 8px 0' }}><strong>📍</strong> {pedido.direccionEntrega}</p>
+              <p style={{ margin: '0 0 8px 0' }}><strong>💰</strong> ${pedido.tarifa.toFixed(2)}</p>
+              {pedido.repartidorId && <p style={{ margin: '0 0 8px 0' }}><strong>🚚</strong> Repartidor #{pedido.repartidorId}</p>}
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+              {pedido.estado !== 'ENTREGADO' && pedido.estado !== 'CANCELADO' && (
+                <button onClick={() => setSelectedPedido(pedido)} style={{ ...styles.btn, ...styles.btnPrimary, padding: '8px 16px', flex: 1 }}>
+                  🗺️ Seguimiento
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ==================== REPARTIDOR DASHBOARD ====================
+function RepartidorDashboard({ token, user }: { token: string; user: Usuario }) {
+  const [asignaciones, setAsignaciones] = useState<Pedido[]>([
+    { id: 4, clienteId: 1750123456, direccionEntrega: 'Av. República E7-123, Quito', estado: 'ASIGNADO', tarifa: 18.00, repartidorId: 1 },
+    { id: 5, clienteId: 1720987654, direccionEntrega: 'Calle Colón y 6 de Diciembre', estado: 'EN_CAMINO', tarifa: 22.50, repartidorId: 1 }
+  ]);
+  const [showEntrega, setShowEntrega] = useState<number | null>(null);
+  const [fotoEntrega, setFotoEntrega] = useState('');
+
+  const confirmarEntrega = (pedidoId: number) => {
+    setAsignaciones(asignaciones.map(p => 
+      p.id === pedidoId ? { ...p, estado: 'ENTREGADO' as const } : p
+    ));
+    setShowEntrega(null);
+    setFotoEntrega('');
+  };
+
+  const iniciarEntrega = (pedidoId: number) => {
+    setAsignaciones(asignaciones.map(p => 
+      p.id === pedidoId ? { ...p, estado: 'EN_CAMINO' as const } : p
+    ));
+  };
+
+  return (
+    <div>
+      <h2 style={{ margin: '0 0 24px 0', fontSize: '28px', color: '#1f2937' }}>🚴 Mis Asignaciones</h2>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+        <div style={{ ...styles.card, backgroundColor: '#dbeafe' }}>
+          <h3 style={{ margin: '0 0 8px 0' }}>📋 Pendientes</h3>
+          <p style={{ fontSize: '36px', fontWeight: 'bold', margin: 0, color: '#1e40af' }}>
+            {asignaciones.filter(p => p.estado === 'ASIGNADO').length}
+          </p>
+        </div>
+        <div style={{ ...styles.card, backgroundColor: '#fef3c7' }}>
+          <h3 style={{ margin: '0 0 8px 0' }}>🚚 En Camino</h3>
+          <p style={{ fontSize: '36px', fontWeight: 'bold', margin: 0, color: '#92400e' }}>
+            {asignaciones.filter(p => p.estado === 'EN_CAMINO').length}
+          </p>
+        </div>
+      </div>
+
+      {showEntrega !== null && (
+        <div style={{ ...styles.card, marginBottom: '24px', border: '2px solid #10b981' }}>
+          <h3 style={{ margin: '0 0 16px 0' }}>📸 Confirmar Entrega - Pedido #{showEntrega}</h3>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>Foto de Entrega (URL o Base64)</label>
+            <input
+              type="text"
+              value={fotoEntrega}
+              onChange={(e) => setFotoEntrega(e.target.value)}
+              style={styles.input}
+              placeholder="URL de la foto o captura de la entrega"
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button onClick={() => confirmarEntrega(showEntrega)} style={{ ...styles.btn, ...styles.btnSuccess }}>
+              ✅ Confirmar Entrega
+            </button>
+            <button onClick={() => setShowEntrega(null)} style={{ ...styles.btn, ...styles.btnSecondary }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gap: '16px' }}>
+        {asignaciones.map((pedido) => (
+          <div key={pedido.id} style={{ ...styles.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 style={{ margin: '0 0 8px 0' }}>Pedido #{pedido.id}</h3>
+              <p style={{ margin: '0 0 4px 0', color: '#6b7280' }}>📍 {pedido.direccionEntrega}</p>
+              <p style={{ margin: 0, color: '#10b981', fontWeight: 'bold' }}>💰 ${pedido.tarifa.toFixed(2)}</p>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={styles.badge(pedido.estado === 'EN_CAMINO' ? 'yellow' : 'blue')}>{pedido.estado}</span>
+              {pedido.estado === 'ASIGNADO' && (
+                <button onClick={() => iniciarEntrega(pedido.id)} style={{ ...styles.btn, ...styles.btnPrimary, padding: '8px 16px' }}>
+                  🚀 Iniciar
+                </button>
+              )}
+              {pedido.estado === 'EN_CAMINO' && (
+                <button onClick={() => setShowEntrega(pedido.id)} style={{ ...styles.btn, ...styles.btnSuccess, padding: '8px 16px' }}>
+                  📸 Entregar
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ==================== SUPERVISOR DASHBOARD ====================
+function SupervisorDashboard({ token }: { token: string }) {
+  const [pedidos, setPedidos] = useState<Pedido[]>([
+    { id: 1, clienteId: 1724562440, direccionEntrega: 'Av. Amazonas N36-152', estado: 'EN_CAMINO', tarifa: 15.50, repartidorId: 1 },
+    { id: 2, clienteId: 1750123456, direccionEntrega: 'Calle García Moreno 456', estado: 'PENDIENTE', tarifa: 12.00 },
+    { id: 3, clienteId: 1720987654, direccionEntrega: 'Mall El Jardín', estado: 'ENTREGADO', tarifa: 8.50, repartidorId: 2 },
+    { id: 4, clienteId: 1760432198, direccionEntrega: 'Av. 6 de Diciembre N45-234', estado: 'ASIGNADO', tarifa: 20.00, repartidorId: 3 }
+  ]);
+
+  const [repartidores] = useState<Repartidor[]>([
+    { id: 1, nombre: 'Carlos Mendoza', cedula: '1712345678', estado: 'EN_RUTA', vehiculoTipo: 'MOTORIZADO', ubicacion: { lat: -0.18, lng: -78.47 } },
+    { id: 2, nombre: 'María García', cedula: '1723456789', estado: 'DISPONIBLE', vehiculoTipo: 'VEHICULO_LIVIANO', ubicacion: { lat: -0.19, lng: -78.48 } },
+    { id: 3, nombre: 'Juan Pérez', cedula: '1734567890', estado: 'EN_RUTA', vehiculoTipo: 'CAMION', ubicacion: { lat: -0.17, lng: -78.46 } }
+  ]);
+
+  const [filtroEstado, setFiltroEstado] = useState<string>('TODOS');
+
+  const reasignarPedido = (pedidoId: number, nuevoRepartidorId: number) => {
+    setPedidos(pedidos.map(p => 
+      p.id === pedidoId ? { ...p, repartidorId: nuevoRepartidorId, estado: 'ASIGNADO' as const } : p
+    ));
+  };
+
+  const exportarCSV = () => {
+    const headers = ['ID', 'Cliente', 'Dirección', 'Estado', 'Tarifa', 'Repartidor'];
+    const rows = pedidos.map(p => [p.id, p.clienteId, p.direccionEntrega, p.estado, p.tarifa, p.repartidorId || 'N/A']);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `pedidos_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  const pedidosFiltrados = filtroEstado === 'TODOS' ? pedidos : pedidos.filter(p => p.estado === filtroEstado);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h2 style={{ margin: 0, fontSize: '28px', color: '#1f2937' }}>👨‍💼 Panel de Supervisor</h2>
+        <button onClick={exportarCSV} style={{ ...styles.btn, ...styles.btnSuccess }}>
+          📥 Exportar CSV
+        </button>
+      </div>
+
+      {/* Mapa de Flota */}
+      <div style={{ ...styles.card, marginBottom: '24px' }}>
+        <h3 style={{ margin: '0 0 16px 0' }}>🗺️ Mapa de Flota en Tiempo Real</h3>
+        <div style={{ height: '300px', backgroundColor: '#e5e7eb', borderRadius: '8px', position: 'relative' }}>
+          {repartidores.map((rep, idx) => (
+            <div key={rep.id} style={{ 
+              position: 'absolute', 
+              top: `${30 + idx * 25}%`, 
+              left: `${20 + idx * 25}%`,
+              backgroundColor: rep.estado === 'DISPONIBLE' ? '#10b981' : '#f59e0b',
+              color: 'white',
+              padding: '8px 12px',
+              borderRadius: '20px',
+              fontSize: '12px',
+              fontWeight: 'bold'
+            }}>
+              {rep.vehiculoTipo === 'MOTORIZADO' ? '🏍️' : rep.vehiculoTipo === 'VEHICULO_LIVIANO' ? '🚗' : '🚚'} {rep.nombre}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Estadísticas */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ ...styles.card, textAlign: 'center' }}>
+          <p style={{ margin: 0, color: '#6b7280' }}>Total</p>
+          <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '8px 0 0 0', color: '#1e40af' }}>{pedidos.length}</p>
+        </div>
+        <div style={{ ...styles.card, textAlign: 'center', backgroundColor: '#dbeafe' }}>
+          <p style={{ margin: 0, color: '#6b7280' }}>Pendientes</p>
+          <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '8px 0 0 0', color: '#1e40af' }}>{pedidos.filter(p => p.estado === 'PENDIENTE').length}</p>
+        </div>
+        <div style={{ ...styles.card, textAlign: 'center', backgroundColor: '#fef3c7' }}>
+          <p style={{ margin: 0, color: '#6b7280' }}>En Camino</p>
+          <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '8px 0 0 0', color: '#92400e' }}>{pedidos.filter(p => p.estado === 'EN_CAMINO').length}</p>
+        </div>
+        <div style={{ ...styles.card, textAlign: 'center', backgroundColor: '#d1fae5' }}>
+          <p style={{ margin: 0, color: '#6b7280' }}>Entregados</p>
+          <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '8px 0 0 0', color: '#065f46' }}>{pedidos.filter(p => p.estado === 'ENTREGADO').length}</p>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div style={{ ...styles.card, marginBottom: '24px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <strong>Filtrar por estado:</strong>
+          {['TODOS', 'PENDIENTE', 'ASIGNADO', 'EN_CAMINO', 'ENTREGADO'].map(estado => (
+            <button
+              key={estado}
+              onClick={() => setFiltroEstado(estado)}
+              style={{
+                ...styles.btn,
+                padding: '8px 16px',
+                backgroundColor: filtroEstado === estado ? '#2563eb' : '#e5e7eb',
+                color: filtroEstado === estado ? 'white' : '#374151'
+              }}
+            >
+              {estado}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Lista de Pedidos */}
+      <div style={styles.card}>
+        <h3 style={{ margin: '0 0 16px 0' }}>📋 Lista de Pedidos</h3>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ backgroundColor: '#f3f4f6' }}>
+              <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>ID</th>
+              <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Dirección</th>
+              <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Estado</th>
+              <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Tarifa</th>
+              <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Reasignar</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pedidosFiltrados.map((pedido) => (
+              <tr key={pedido.id}>
+                <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb' }}>#{pedido.id}</td>
+                <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb' }}>{pedido.direccionEntrega}</td>
+                <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb' }}>
+                  <span style={styles.badge(
+                    pedido.estado === 'ENTREGADO' ? 'green' : 
+                    pedido.estado === 'EN_CAMINO' ? 'yellow' : 
+                    pedido.estado === 'PENDIENTE' ? 'blue' : 'yellow'
+                  )}>{pedido.estado}</span>
+                </td>
+                <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb' }}>${pedido.tarifa.toFixed(2)}</td>
+                <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb' }}>
+                  {pedido.estado !== 'ENTREGADO' && (
+                    <select
+                      value={pedido.repartidorId || ''}
+                      onChange={(e) => reasignarPedido(pedido.id, parseInt(e.target.value))}
+                      style={{ padding: '8px', borderRadius: '4px', border: '1px solid #d1d5db' }}
+                    >
+                      <option value="">Sin asignar</option>
+                      {repartidores.filter(r => r.estado !== 'NO_DISPONIBLE').map(rep => (
+                        <option key={rep.id} value={rep.id}>{rep.nombre} ({rep.vehiculoTipo})</option>
+                      ))}
+                    </select>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ==================== GERENTE DASHBOARD ====================
+function GerenteDashboard({ token }: { token: string }) {
+  const [fechaInicio, setFechaInicio] = useState('2026-02-01');
+  const [fechaFin, setFechaFin] = useState('2026-02-11');
+  
+  const kpis: KPI = {
+    totalPedidos: 156,
+    entregados: 142,
+    enCamino: 8,
+    pendientes: 6,
+    tasaEntrega: 91.03,
+    ingresoTotal: 2847.50
+  };
+
+  const kpisPorZona = [
+    { zona: 'Quito Norte', pedidos: 45, entregados: 42, ingresos: 892.50 },
+    { zona: 'Quito Sur', pedidos: 38, entregados: 35, ingresos: 684.00 },
+    { zona: 'Valle de los Chillos', pedidos: 28, entregados: 26, ingresos: 512.00 },
+    { zona: 'Cumbayá', pedidos: 45, entregados: 39, ingresos: 759.00 }
+  ];
+
+  const exportarReporte = () => {
+    const headers = ['Zona', 'Total Pedidos', 'Entregados', 'Ingresos'];
+    const rows = kpisPorZona.map(k => [k.zona, k.pedidos, k.entregados, k.ingresos]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `reporte_kpis_${fechaInicio}_${fechaFin}.csv`;
+    link.click();
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h2 style={{ margin: 0, fontSize: '28px', color: '#1f2937' }}>📊 Dashboard de KPIs</h2>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} style={{ ...styles.input, width: 'auto' }} />
+          <span>-</span>
+          <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} style={{ ...styles.input, width: 'auto' }} />
+          <button onClick={exportarReporte} style={{ ...styles.btn, ...styles.btnSuccess }}>📥 Exportar CSV</button>
+        </div>
+      </div>
+
+      {/* KPIs Principales */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ ...styles.card, textAlign: 'center' }}>
+          <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>Total Pedidos</p>
+          <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '8px 0 0 0', color: '#1e40af' }}>{kpis.totalPedidos}</p>
+        </div>
+        <div style={{ ...styles.card, textAlign: 'center', backgroundColor: '#d1fae5' }}>
+          <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>Entregados</p>
+          <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '8px 0 0 0', color: '#065f46' }}>{kpis.entregados}</p>
+        </div>
+        <div style={{ ...styles.card, textAlign: 'center', backgroundColor: '#fef3c7' }}>
+          <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>En Camino</p>
+          <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '8px 0 0 0', color: '#92400e' }}>{kpis.enCamino}</p>
+        </div>
+        <div style={{ ...styles.card, textAlign: 'center', backgroundColor: '#dbeafe' }}>
+          <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>Pendientes</p>
+          <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '8px 0 0 0', color: '#1e40af' }}>{kpis.pendientes}</p>
+        </div>
+        <div style={{ ...styles.card, textAlign: 'center', backgroundColor: '#ede9fe' }}>
+          <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>Tasa Entrega</p>
+          <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '8px 0 0 0', color: '#7c3aed' }}>{kpis.tasaEntrega}%</p>
+        </div>
+        <div style={{ ...styles.card, textAlign: 'center', backgroundColor: '#fce7f3' }}>
+          <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>Ingresos</p>
+          <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '8px 0 0 0', color: '#db2777' }}>${kpis.ingresoTotal.toFixed(2)}</p>
+        </div>
+      </div>
+
+      {/* Gráficos simulados */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+        <div style={styles.card}>
+          <h3 style={{ margin: '0 0 16px 0' }}>📈 Tendencia de Entregas (Últimos 7 días)</h3>
+          <div style={{ height: '200px', display: 'flex', alignItems: 'end', gap: '8px', padding: '16px' }}>
+            {[65, 78, 82, 90, 85, 92, 88].map((valor, idx) => (
+              <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ 
+                  width: '100%', 
+                  height: `${valor * 1.5}px`, 
+                  backgroundColor: '#2563eb', 
+                  borderRadius: '4px 4px 0 0' 
+                }}></div>
+                <span style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>Día {idx + 1}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        <div style={styles.card}>
+          <h3 style={{ margin: '0 0 16px 0' }}>🥧 Distribución por Estado</h3>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+            <div style={{ position: 'relative', width: '180px', height: '180px' }}>
+              <div style={{ 
+                width: '100%', 
+                height: '100%', 
+                borderRadius: '50%', 
+                background: `conic-gradient(#10b981 0% ${kpis.tasaEntrega}%, #f59e0b ${kpis.tasaEntrega}% ${kpis.tasaEntrega + 5}%, #3b82f6 ${kpis.tasaEntrega + 5}% 100%)` 
+              }}></div>
+              <div style={{ 
+                position: 'absolute', 
+                top: '30px', 
+                left: '30px', 
+                width: '120px', 
+                height: '120px', 
+                backgroundColor: 'white', 
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '24px',
+                fontWeight: 'bold'
+              }}>
+                {kpis.tasaEntrega}%
+              </div>
+            </div>
+            <div style={{ marginLeft: '24px' }}>
+              <p style={{ margin: '8px 0' }}><span style={{ display: 'inline-block', width: '12px', height: '12px', backgroundColor: '#10b981', marginRight: '8px' }}></span>Entregados</p>
+              <p style={{ margin: '8px 0' }}><span style={{ display: 'inline-block', width: '12px', height: '12px', backgroundColor: '#f59e0b', marginRight: '8px' }}></span>En Camino</p>
+              <p style={{ margin: '8px 0' }}><span style={{ display: 'inline-block', width: '12px', height: '12px', backgroundColor: '#3b82f6', marginRight: '8px' }}></span>Pendientes</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabla por Zona */}
+      <div style={styles.card}>
+        <h3 style={{ margin: '0 0 16px 0' }}>🌍 KPIs por Zona</h3>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ backgroundColor: '#f3f4f6' }}>
+              <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Zona</th>
+              <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e5e7eb' }}>Total Pedidos</th>
+              <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e5e7eb' }}>Entregados</th>
+              <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #e5e7eb' }}>Tasa</th>
+              <th style={{ padding: '12px', textAlign: 'right', borderBottom: '2px solid #e5e7eb' }}>Ingresos</th>
+            </tr>
+          </thead>
+          <tbody>
+            {kpisPorZona.map((zona) => (
+              <tr key={zona.zona}>
+                <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', fontWeight: 'bold' }}>{zona.zona}</td>
+                <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', textAlign: 'center' }}>{zona.pedidos}</td>
+                <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', textAlign: 'center' }}>{zona.entregados}</td>
+                <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', textAlign: 'center' }}>
+                  <span style={styles.badge((zona.entregados / zona.pedidos) > 0.9 ? 'green' : 'yellow')}>
+                    {((zona.entregados / zona.pedidos) * 100).toFixed(1)}%
+                  </span>
+                </td>
+                <td style={{ padding: '12px', borderBottom: '1px solid #e5e7eb', textAlign: 'right', color: '#10b981', fontWeight: 'bold' }}>
+                  ${zona.ingresos.toFixed(2)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export default App;

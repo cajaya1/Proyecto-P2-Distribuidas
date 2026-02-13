@@ -23,8 +23,24 @@ public class AuthService {
     }
 
     public String generateToken(String username) {
-        // Buscamos el rol del usuario para meterlo en el token
         Usuario user = repository.findByUsername(username).orElseThrow();
-        return jwtService.generateToken(username, user.getRol());
+        return jwtService.generateToken(username, user.getRol(), user.getZoneId(), user.getFleetType());
+    }
+    
+    public String generateRefreshToken(String username) {
+        return jwtService.generateRefreshToken(username);
+    }
+    
+    public String refreshToken(String refreshToken) {
+        if (!jwtService.isTokenValid(refreshToken) || !jwtService.isRefreshToken(refreshToken)) {
+            throw new RuntimeException("Refresh token inválido o expirado");
+        }
+        String username = jwtService.extractUsername(refreshToken);
+        return generateToken(username);
+    }
+    
+    public Usuario findByUsername(String username) {
+        return repository.findByUsername(username).orElseThrow(() -> 
+            new RuntimeException("Usuario no encontrado: " + username));
     }
 }

@@ -11,6 +11,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/pedidos")
+@CrossOrigin(origins = {"http://localhost:3001", "http://localhost:5173", "http://localhost:3000"}, allowCredentials = "true")
 public class PedidoController {
 
     private final PedidoService pedidoService;
@@ -27,6 +28,11 @@ public class PedidoController {
     @GetMapping
     public List<Pedido> listar() {
         return pedidoService.listarPedidos();
+    }
+    
+    @GetMapping("/{id}")
+    public ResponseEntity<Pedido> obtenerPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(pedidoService.obtenerPorId(id));
     }
     
     @PatchMapping("/{id}")
